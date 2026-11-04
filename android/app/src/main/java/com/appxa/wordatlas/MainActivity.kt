@@ -33,7 +33,7 @@ class MainActivity : Activity() {
         web.settings.javaScriptEnabled = true
         web.settings.domStorageEnabled = true
         web.settings.allowFileAccess = false
-        web.settings.allowContentAccess = false
+        web.settings.allowContentAccess = true
         web.settings.mediaPlaybackRequiresUserGesture = false
         web.addJavascriptInterface(Bridge(), "NativeOffline")
         web.webViewClient = object : WebViewClient() {
