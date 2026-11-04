@@ -34,6 +34,5 @@ jobs:
           arch: x86_64
           disable-animations: true
           script: |
-            cd android
-            gradle :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.appxa.wordatlas.OfflineStartupTest
-            gradle :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.appxa.wordatlas.LevelDownloadTest
+            gradle -p android :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.appxa.wordatlas.OfflineStartupTest
+            gradle -p android :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.appxa.wordatlas.LevelDownloadTest

@@ -27,7 +27,7 @@ class LevelDownloadTest {
         throw AssertionError("App did not start")
     }
     @Test fun downloadC2ThenRestartWithoutInternet() {
-        shell("svc wifi enable"); shell("svc data enable")
+        shell("svc wifi enable"); shell("svc data enable"); Thread.sleep(10000)
         val ctx = ApplicationProvider.getApplicationContext<Context>()
         val prefs = ctx.getSharedPreferences("offline-levels-v1", Context.MODE_PRIVATE)
         prefs.edit().clear().commit(); File(ctx.filesDir, "offline-media").deleteRecursively()
