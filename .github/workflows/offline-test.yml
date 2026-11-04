@@ -33,4 +33,7 @@ jobs:
           api-level: 30
           arch: x86_64
           disable-animations: true
-          script: cd android && gradle :app:connectedDebugAndroidTest
+          script: |
+            cd android
+            gradle :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.appxa.wordatlas.OfflineStartupTest
+            gradle :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.appxa.wordatlas.LevelDownloadTest
