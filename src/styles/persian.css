@@ -1,0 +1,54 @@
+/* The original Word Atlas styles remain intact; these overrides adapt them for Persian. */
+:root {
+  --sans: "Vazirmatn Variable", Tahoma, sans-serif;
+  --serif: "Fraunces Variable", "Vazirmatn Variable", Georgia, serif;
+}
+body { font-family: var(--sans); }
+[lang="en"], .en { font-family: var(--serif); }
+/* Persian adaptation of the original layout: keep English content left-to-right. */
+:lang(fa) { letter-spacing: normal; }
+.logo-text b { font-family: var(--sans); letter-spacing: normal; }
+.eyebrow { letter-spacing: normal; line-height: 1.5; }
+.display { line-height: 1.4; letter-spacing: normal; }
+.topbar-logo { margin-right: 0; margin-left: 8px; }
+.topnav { margin-left: 0; margin-right: 8px; }
+.topbar-tools { margin-left: 0; margin-right: auto; }
+.search-pill { margin-right: 0; margin-left: 6px; padding: 0 14px 0 8px; }
+.search-pill span, .choice, .mode-card, .option, .tile, .topic-card, .amb-pop, .amb-pop li button span { text-align: start; }
+.result-count { margin-left: 0; margin-right: auto; }
+.entry-actions { margin-right: 0; margin-left: 40px; }
+.usage-note { padding-left: 0; border-left: 0; padding-right: 12px; border-right: 2px solid var(--terra-soft); }
+[lang="en"], .ipa, .typing-text, .typing-input, .spell-input, .slots { direction: ltr; unicode-bidi: isolate; }
+p[lang="en"], h2[lang="en"], .senses .en { text-align: left; }
+.headword, .typing-text.is-word { font-family: var(--serif); }
+@media (max-width: 759px) {
+  .search-pill { margin: 0; padding: 0; }
+}
+
+/* Constrain horizontally scrolling filters inside the viewport. */
+.filters { min-width: 0; grid-template-columns: minmax(0, 1fr); }
+.filters-row { min-width: 0; }
+.filters-row .segmented { max-width: 100%; }
+.teaser .illo { margin-right: 0; margin-left: -10px; }
+.teaser:hover .illo { margin-right: 0; margin-left: 4px; }
+.teaser > span { margin-left: 0; margin-right: 22px; }
+.pos { direction: ltr; unicode-bidi: isolate; }
+@media (min-width: 760px) {
+  .journey::before { background: linear-gradient(270deg, rgba(18,24,42,.84) 0%, rgba(18,24,42,.55) 38%, rgba(18,24,42,.05) 85%); }
+}
+@media (max-width: 759px) {
+  .practice .segmented-wide { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-radius: 18px; }
+  .practice .segmented-wide button { white-space: normal; }
+}
+/* Forward navigation follows the reading direction. */
+button .lucide-arrow-right, a .lucide-arrow-right { transform: scaleX(-1); }
+@media (max-width: 759px) {
+  .onboard .segmented-wide { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-radius: 18px; }
+  .onboard .segmented-wide button { white-space: normal; }
+}
+
+.offline-row{padding:14px 0;border-top:1px solid var(--line,rgba(128,128,128,.2))}
+.offline-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.offline-head span{font-size:.84rem;color:var(--muted,#777)}
+.offline-row progress{display:block;width:100%;height:8px;margin:10px 0;accent-color:#7f9b77}
+.offline-controls{margin-top:10px}.offline-controls button:disabled{opacity:.7;cursor:wait}
