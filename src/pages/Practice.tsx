@@ -33,6 +33,13 @@ export function Practice() {
   const [source, setSource] = useState<Source>(() => (Object.keys(progress.cards).length ? "recent" : "path"));
   const [round, setRound] = useState<{ entries: Entry[]; key: number } | null>(null);
 
+  useEffect(() => {
+    if (!round) return;
+    const closeRound = (e: Event) => { e.preventDefault(); setRound(null); };
+    window.addEventListener("android-back", closeRound);
+    return () => window.removeEventListener("android-back", closeRound);
+  }, [round]);
+
   const pool = useMemo(() => {
     const learned = Object.entries(progress.cards)
       .sort((a, b) => (b[1].last ?? 0) - (a[1].last ?? 0))

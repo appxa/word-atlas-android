@@ -37,3 +37,4 @@ jobs:
             gradle -p android :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.appxa.wordatlas.OfflineStartupTest
             gradle -p android :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.appxa.wordatlas.LevelDownloadTest
             gradle -p android :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.appxa.wordatlas.GalaxyScrollTest
+            gradle -p android :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.appxa.wordatlas.BackNavigationTest

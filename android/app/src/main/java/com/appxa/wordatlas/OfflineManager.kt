@@ -4,9 +4,13 @@ import android.content.Context
 import org.json.JSONObject
 import java.io.File
 import java.net.URL
+import java.net.HttpURLConnection
 import java.security.MessageDigest
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CancellationException
 
 /** App-private persistent media. A level is complete only when every file is verified. */
 class OfflineManager private constructor(private val context: Context) {
@@ -29,7 +33,15 @@ class OfflineManager private constructor(private val context: Context) {
         val complete = prefs.getBoolean("$level-complete", false) && prefs.getString("$level-manifest", "") == p.fingerprint
         State(p.total, if (complete) p.total else prefs.getLong("$level-bytes", 0).coerceIn(0, p.total), if (complete) "complete" else "idle")
     }
+    private class DownloadJob {
+        val cancelled = AtomicBoolean(false)
+        val connections = ConcurrentHashMap.newKeySet<HttpURLConnection>()
+    }
     @Volatile private var active = ""
+    @Volatile private var activeJob: DownloadJob? = null
+    private fun ensureActive(job: DownloadJob) {
+        if (job.cancelled.get()) throw CancellationException("Cancelled")
+    }
     @Synchronized fun isDownloaded(level: String): Boolean = states[level]?.status == "complete"
     fun hasMedia(path: String): Boolean = try { fileFor(path).isFile } catch (_: Exception) { false }
     @Synchronized fun status(level: String): String {
@@ -39,78 +51,117 @@ class OfflineManager private constructor(private val context: Context) {
     @Synchronized fun start(level: String) {
         val state = states[level] ?: return
         if (active.isNotEmpty() || state.status == "complete") return
-        active = level; state.status = "checking"; state.error = ""
-        runner.execute { download(level) }
+        val job = DownloadJob()
+        active = level; activeJob = job; state.status = "checking"; state.error = ""
+        runner.execute { download(level, job) }
     }
+    @Synchronized fun cancel(level: String) {
+        val job = activeJob ?: return
+        if (active != level || states[level]?.status !in listOf("checking", "downloading") || job.cancelled.getAndSet(true)) return
+        states[level]?.status = "cancelling"
+        job.connections.toList().forEach { conn -> Thread { try { conn.disconnect() } catch (_: Exception) { } }.start() }
+    }
+    @Synchronized fun cancelActive() { if (activeJob != null) cancel(active) }
     private fun fileFor(path: String): File {
         val f = File(root, path).canonicalFile
         require(f.path.startsWith(root.canonicalPath + File.separator))
         return f
     }
-    private fun valid(f: File, item: Item): Boolean {
+    private fun valid(f: File, item: Item, job: DownloadJob): Boolean {
         if (!f.isFile || f.length() != item.size) return false
         val digest = MessageDigest.getInstance("SHA-256")
-        f.inputStream().buffered().use { input -> val b = ByteArray(32768); while (true) { val n = input.read(b); if (n < 0) break; digest.update(b, 0, n) } }
+        f.inputStream().buffered().use { input -> val b = ByteArray(32768); while (true) { ensureActive(job); val n = input.read(b); if (n < 0) break; digest.update(b, 0, n) } }
         return digest.digest().joinToString("") { "%02x".format(it.toInt() and 0xff) } == item.hash
     }
-    private fun download(level: String) {
+    private fun download(level: String, job: DownloadJob) {
         val p = packs.getValue(level); val state = states.getValue(level)
         try {
             root.mkdirs(); val missing = ArrayList<Item>(); var have = 0L
-            for (item in p.items) { val f = fileFor(item.path); if (valid(f, item)) have += item.size else { f.delete(); missing.add(item) } }
+            for (item in p.items) {
+                ensureActive(job)
+                val f = fileFor(item.path)
+                if (valid(f, item, job)) have += item.size else { f.delete(); missing.add(item) }
+            }
             state.downloaded = have
             if (root.usableSpace < p.total - have + 16L * 1024 * 1024) throw IllegalStateException("فضای کافی برای دانلود وجود ندارد.")
-            state.status = "downloading"
+            synchronized(this) { ensureActive(job); state.status = "downloading" }
             val downloaded = AtomicLong(have); val errors = java.util.concurrent.atomic.AtomicReference<String?>(null)
             val pool = Executors.newFixedThreadPool(4)
             try {
                 val tasks = missing.map { item -> pool.submit {
-                    if (errors.get() != null) return@submit
+                    if (job.cancelled.get() || errors.get() != null) return@submit
                     try {
-                        fetch(item)
-                        val n = downloaded.addAndGet(item.size); state.downloaded = n
-                        prefs.edit().putLong("$level-bytes", n).apply()
-                    } catch (e: Exception) { errors.compareAndSet(null, e.message ?: "دانلود ناموفق بود.") }
+                        fetch(item, job)
+                        synchronized(this@OfflineManager) {
+                            val n = downloaded.addAndGet(item.size); state.downloaded = n
+                            prefs.edit().putLong("$level-bytes", n).apply()
+                        }
+                    } catch (e: Exception) {
+                        if (!job.cancelled.get()) errors.compareAndSet(null, e.message ?: "دانلود ناموفق بود.")
+                    }
                 } }
                 tasks.forEach { it.get() }
             } finally { pool.shutdown() }
+            ensureActive(job)
             errors.get()?.let { throw IllegalStateException(it) }
-            // All files have been hashed before marking the level complete.
-            state.downloaded = p.total; state.status = "complete"
-            prefs.edit().putLong("$level-bytes", p.total).putString("$level-manifest", p.fingerprint).putBoolean("$level-complete", true).apply()
+            synchronized(this) {
+                ensureActive(job)
+                state.downloaded = p.total; state.status = "complete"
+                prefs.edit().putLong("$level-bytes", p.total).putString("$level-manifest", p.fingerprint).putBoolean("$level-complete", true).apply()
+            }
         } catch (e: Exception) {
-            state.status = "error"; state.error = if (e.message?.contains("فضای") == true) e.message!! else "دانلود متوقف شد؛ اتصال اینترنت را بررسی و دوباره تلاش کن."
-            prefs.edit().putBoolean("$level-complete", false).putLong("$level-bytes", state.downloaded).apply()
-        } finally { active = "" }
+            synchronized(this) {
+                if (job.cancelled.get()) { state.status = "idle"; state.error = "" }
+                else {
+                    state.status = "error"
+                    state.error = if (e.message?.contains("فضای") == true) e.message!! else "دانلود متوقف شد؛ اتصال اینترنت را بررسی و دوباره تلاش کن."
+                }
+                prefs.edit().putBoolean("$level-complete", false).putLong("$level-bytes", state.downloaded).apply()
+            }
+        } finally {
+            synchronized(this) { activeJob = null; active = "" }
+        }
     }
-    private fun fetch(item: Item) {
+    private fun fetch(item: Item, job: DownloadJob) {
         val dest = fileFor(item.path); dest.parentFile?.mkdirs()
         val tmp = File(dest.parentFile, dest.name + ".part")
         var failure: Exception? = null
         repeat(3) { attempt ->
+            ensureActive(job)
             try {
                 val base = when (item.origin) {
                     "primary" -> "https://appxa.github.io/word-atlas/atlas/"
                     "upstream" -> "https://0xlei.tech/words/atlas/"
                     else -> throw IllegalStateException("منبع فایل نامعتبر است")
                 }
-                val conn = URL(base + item.path).openConnection() as java.net.HttpURLConnection
+                val conn = URL(base + item.path).openConnection() as HttpURLConnection
+                job.connections.add(conn)
                 conn.connectTimeout = 20000; conn.readTimeout = 30000; conn.instanceFollowRedirects = true
                 try {
+                    ensureActive(job)
                     if (conn.responseCode != 200) throw IllegalStateException("HTTP ${conn.responseCode}")
-                    conn.inputStream.use { input -> tmp.outputStream().buffered().use { output -> input.copyTo(output) } }
-                } finally { conn.disconnect() }
-                if (!valid(tmp, item)) throw IllegalStateException("فایل دانلودشده ناقص است")
+                    conn.inputStream.use { input -> tmp.outputStream().buffered().use { output ->
+                        val buffer = ByteArray(32768)
+                        while (true) { ensureActive(job); val n = input.read(buffer); if (n < 0) break; output.write(buffer, 0, n) }
+                    } }
+                } finally { job.connections.remove(conn); conn.disconnect() }
+                ensureActive(job)
+                if (!valid(tmp, item, job)) throw IllegalStateException("فایل دانلودشده ناقص است")
+                ensureActive(job)
                 if (!tmp.renameTo(dest)) throw IllegalStateException("ذخیره‌سازی ناموفق بود")
                 return
-            } catch (e: Exception) { failure = e; tmp.delete(); if (attempt < 2) Thread.sleep(400L * (attempt + 1)) }
+            } catch (e: Exception) {
+                failure = e; tmp.delete()
+                ensureActive(job)
+                if (attempt < 2) Thread.sleep(400L * (attempt + 1))
+            }
         }
         throw failure ?: IllegalStateException("دانلود ناموفق بود")
     }
     @Synchronized fun remove(level: String) {
         val p = packs[level] ?: return
         if (active.isNotEmpty()) return
-        val s = states.getValue(level); active = level; s.status = "checking"
+        val s = states.getValue(level); active = level; s.status = "deleting"
         prefs.edit().putBoolean("$level-complete", false).apply()
         runner.execute {
             try { p.items.forEach { fileFor(it.path).delete() }; s.downloaded = 0; s.status = "idle"; s.error = ""; prefs.edit().putLong("$level-bytes", 0).apply() }

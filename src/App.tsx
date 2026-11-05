@@ -1,5 +1,5 @@
 import { BookOpen, ChevronLeft, ChevronRight, Compass, Github, Keyboard, Moon, Search, Sun, User } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AtlasContext, useAtlas, useEntry } from "./atlas/context";
 import { loadOpenAtlas, loadPrivateAtlas } from "./atlas/data";
 import type { Atlas } from "./atlas/types";
@@ -91,6 +91,8 @@ export default function App() {
   );
 }
 
+declare global { interface Window { androidBack?: () => boolean } }
+
 function Shell({ privateAvailable }: { privateAvailable: boolean }) {
   const { route, word } = useLocation();
   const onboarded = useStore((s) => s.settings.onboarded);
@@ -98,6 +100,25 @@ function Shell({ privateAvailable }: { privateAvailable: boolean }) {
   const [palette, setPalette] = useState(false);
   const [splash, setSplash] = useState(shouldShowSplash);
   const focus = route.page === "learn";
+  const lastTab = useRef<Route>({ page: "today" });
+  if (["today", "atlas", "practice", "me"].includes(route.page)) lastTab.current = route;
+
+  useEffect(() => {
+    const handleBack = () => {
+      if (splash) { document.querySelector<HTMLElement>(".splash")?.click(); return true; }
+      if (palette) { setPalette(false); return true; }
+      const ambience = document.querySelector<HTMLElement>('.amb-pop')?.parentElement?.querySelector<HTMLElement>('.amb-btn');
+      if (ambience) { ambience.click(); return true; }
+      if (word) { closeWord(); return true; }
+      // The current tab can consume back to close an internal screen, e.g. a typing round.
+      if (!window.dispatchEvent(new Event("android-back", { cancelable: true }))) return true;
+      if (route.page === "about") { go(lastTab.current, null, true); return true; }
+      if (route.page !== "today") { go({ page: "today" }, null, true); return true; }
+      return false;
+    };
+    window.androidBack = handleBack;
+    return () => { if (window.androidBack === handleBack) delete window.androidBack; };
+  }, [palette, route.page, splash, word]);
 
   useEffect(() => {
     const on = (e: KeyboardEvent) => {

@@ -1,5 +1,5 @@
-export interface LevelState { level: string; total: number; downloaded: number; state: "idle" | "checking" | "downloading" | "complete" | "error"; error?: string; }
-interface OfflineBridge { status(level: string): string; isDownloaded(level: string): boolean; hasMedia(path: string): boolean; start(level: string): void; remove(level: string): void; saveBackup(data: string, name: string): void; }
+export interface LevelState { level: string; total: number; downloaded: number; state: "idle" | "checking" | "downloading" | "cancelling" | "deleting" | "complete" | "error"; error?: string; }
+interface OfflineBridge { status(level: string): string; isDownloaded(level: string): boolean; hasMedia(path: string): boolean; start(level: string): void; cancel(level: string): void; remove(level: string): void; saveBackup(data: string, name: string): void; }
 declare global { interface Window { NativeOffline?: OfflineBridge; } }
 const REMOTE = "https://appxa.github.io/word-atlas/atlas/";
 const LIVE = "https://0xlei.tech/words/atlas/";

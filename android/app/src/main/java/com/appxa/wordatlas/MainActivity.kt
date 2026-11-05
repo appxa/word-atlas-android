@@ -4,6 +4,8 @@ import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.os.SystemClock
+import android.view.ViewGroup
 import android.webkit.JavascriptInterface
 import android.webkit.MimeTypeMap
 import android.webkit.ValueCallback
@@ -66,6 +68,7 @@ class MainActivity : Activity() {
         @JavascriptInterface fun isDownloaded(level: String): Boolean = offline.isDownloaded(level)
         @JavascriptInterface fun hasMedia(path: String): Boolean = offline.hasMedia(path)
         @JavascriptInterface fun start(level: String) = offline.start(level)
+        @JavascriptInterface fun cancel(level: String) = offline.cancel(level)
         @JavascriptInterface fun remove(level: String) = offline.remove(level)
         @JavascriptInterface fun saveBackup(data: String, name: String) {
             runOnUiThread {
@@ -107,6 +110,24 @@ class MainActivity : Activity() {
             } catch (_: Exception) { Toast.makeText(this, "ذخیرهٔ پشتیبان ناموفق بود", Toast.LENGTH_LONG).show() }
         }
     }
+    private var lastExitRequestAt = 0L
     @Deprecated("Use OnBackInvokedCallback")
-    override fun onBackPressed() { if (web.canGoBack()) web.goBack() else super.onBackPressed() }
+    override fun onBackPressed() {
+        web.evaluateJavascript("typeof window.androidBack === 'function' && window.androidBack() === true") { handled ->
+            if (handled == "true") { lastExitRequestAt = 0L; return@evaluateJavascript }
+            val now = SystemClock.elapsedRealtime()
+            if (lastExitRequestAt != 0L && now - lastExitRequestAt < 2000) {
+                offline.cancelActive()
+                finishAndRemoveTask()
+            } else {
+                lastExitRequestAt = now
+                Toast.makeText(this, "برای خروج دوباره دکمهٔ بازگشت را بزن", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+    override fun onDestroy() {
+        (web.parent as? ViewGroup)?.removeView(web)
+        web.stopLoading(); web.destroy()
+        super.onDestroy()
+    }
 }

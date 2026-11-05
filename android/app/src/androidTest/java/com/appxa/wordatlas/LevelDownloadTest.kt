@@ -61,6 +61,30 @@ class LevelDownloadTest {
             checkPlayback(s, "library", ".entry-detail .examples li:first-child .ex-speak", "/audio/ex/library.mp3")
             checkPlayback(s, "library", ".entry-detail .examples li:nth-child(2) .ex-speak", "appxa.github.io/word-atlas/atlas/audio/ex2/library.mp3")
             checkPlayback(s, "avenge", ".entry-detail .examples li:nth-child(2) .ex-speak", "0xlei.tech/words/atlas/audio/ex2/avenge.mp3")
+            // Exercise the actual Profile controls, then cancel a partial C2 download.
+            js(s, "location.hash='#/me'; true")
+            var rowReady = false
+            for (i in 0 until 60) { if (js(s, "!!document.querySelector('[aria-label=\"دانلود C2\"]')") == "true") { rowReady = true; break }; Thread.sleep(500) }
+            assertTrue("Offline download controls unavailable", rowReady)
+            assertTrue("Download control, level and total size should share a row", js(s, "(function(){const b=document.querySelector('[aria-label=\"دانلود C2\"]'),row=b.closest('.offline-row'),head=row.querySelector('.offline-head');return head.contains(b) && Math.abs(b.getBoundingClientRect().top-head.querySelector('strong').getBoundingClientRect().top)<30 && !!head.querySelector('.offline-size') && !row.innerText.includes('دانلود شده')})()") == "true")
+            js(s, "document.querySelector('[aria-label=\"دانلود C2\"]').click(); true")
+            var cancellable = false
+            for (i in 0 until 120) {
+                val state = js(s, "JSON.parse(NativeOffline.status('C2')).state")
+                if (state.contains("error")) throw AssertionError("Initial download failed: " + js(s, "NativeOffline.status('C2')"))
+                if (js(s, "JSON.parse(NativeOffline.status('C2')).downloaded > 0 && !!document.querySelector('[aria-label=\"لغو دانلود C2\"]')") == "true") { cancellable = true; break }
+                Thread.sleep(500)
+            }
+            assertTrue("Partial download did not become cancellable", cancellable)
+            js(s, "document.querySelector('[aria-label=\"لغو دانلود C2\"]').click(); true")
+            var cancelled = false
+            for (i in 0 until 120) { if (js(s, "JSON.parse(NativeOffline.status('C2')).state==='idle'") == "true") { cancelled = true; break }; Thread.sleep(500) }
+            assertTrue("Cancellation did not finish", cancelled)
+            assertTrue("Completed files not retained", js(s, "JSON.parse(NativeOffline.status('C2')).downloaded > 0 && !NativeOffline.isDownloaded('C2')") == "true")
+            assertTrue("Temporary files were not cleaned up", !File(ctx.filesDir, "offline-media").walkTopDown().any { it.name.endsWith(".part") })
+            val pausedBytes = js(s, "JSON.parse(NativeOffline.status('C2')).downloaded").toLong()
+            Thread.sleep(2000)
+            assertTrue("Download continued after cancellation", js(s, "JSON.parse(NativeOffline.status('C2')).downloaded").toLong() == pausedBytes)
             js(s, "NativeOffline.start('C2'); true")
             var complete = false
             for (i in 0 until 900) {
