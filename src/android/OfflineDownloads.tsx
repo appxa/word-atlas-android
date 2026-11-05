@@ -23,10 +23,10 @@ export function OfflineDownloads() {
       return <div className="offline-row" key={s.level}>
         <div className="offline-head">
           <strong dir="ltr">{s.level}</strong>
-          <span className="offline-size">{fmt(s.total)}</span>
           {s.state === "complete" ? <button className="btn btn-ghost btn-danger" aria-label={`حذف فایل‌های ${s.level}`} disabled={busy} onClick={() => { if (confirm(`فایل‌های آفلاین ${s.level} حذف شوند؟`)) window.NativeOffline?.remove(s.level); }}>حذف</button>
           : active ? <button className="btn btn-ghost" aria-label={`لغو دانلود ${s.level}`} onClick={() => window.NativeOffline?.cancel(s.level)}>لغو</button>
           : <button className="btn btn-ghost" disabled={busy || stopping} aria-label={`دانلود ${s.level}`} onClick={() => window.NativeOffline?.start(s.level)}>{s.state === "cancelling" ? "در حال لغو…" : s.state === "deleting" ? "در حال حذف…" : s.downloaded ? "ادامه" : "دانلود"}</button>}
+          <span className="offline-size">{fmt(s.total)}</span>
         </div>
         {(active || s.state === "cancelling") && <div className="offline-progress"><progress max={100} value={percent} aria-label={`پیشرفت دانلود ${s.level}`} /><span>{s.state === "checking" ? "در حال بررسی…" : `${percent.toLocaleString("fa-IR")}٪`}</span></div>}
         {s.state === "error" && <p className="warn-text">{s.error || "دانلود ناموفق بود؛ دوباره تلاش کن."}</p>}

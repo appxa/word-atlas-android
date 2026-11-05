@@ -50,7 +50,7 @@ button .lucide-arrow-right, a .lucide-arrow-right { transform: scaleX(-1); }
 .offline-row{padding:10px 0;border-top:1px solid var(--line,rgba(128,128,128,.2))}
 .offline-head{display:flex;align-items:center;gap:8px;min-width:0}
 .offline-head strong{min-width:2.4em}
-.offline-head .offline-size{font-size:.84rem;color:var(--ink-3);white-space:nowrap;flex:1}
+.offline-head .offline-size{font-size:.84rem;color:var(--ink-3);white-space:nowrap;flex:1;text-align:end}
 .offline-head .btn{min-height:40px;padding:6px 12px;white-space:nowrap}
 .offline-head button:disabled{opacity:.7;cursor:wait}
 .offline-progress{display:flex;align-items:center;gap:8px;margin-top:6px;font-size:.8rem;color:var(--ink-3)}

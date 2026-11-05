@@ -47,6 +47,9 @@ class GalaxyScrollTest {
             js(s, "localStorage.setItem('word-atlas:settings', JSON.stringify({...JSON.parse(localStorage.getItem('word-atlas:settings')||'{}'),onboarded:true,splash:false,sfx:false})); location.hash='#/'; location.reload(); true")
             waitFor(s, "!!document.querySelector('.today-grid .galaxy-panel') && !document.querySelector('.splash') && !document.querySelector('.onboard')")
             assertTrue("Galaxy is not last after topics", js(s, "document.querySelector('.today-grid').lastElementChild.classList.contains('galaxy-panel') && !!(document.querySelector('.topics-panel').compareDocumentPosition(document.querySelector('.galaxy-panel')) & Node.DOCUMENT_POSITION_FOLLOWING)") == "true")
+            // Add test-only trailing space so the last panel can be scrolled into view
+            // even on short or unusually tall emulator displays.
+            js(s, "(function(){const d=document.createElement('div'); d.style.height='900px'; document.body.appendChild(d); return true})()")
             swipeDownOnCanvas(s, ".galaxy-mini canvas")
             js(s, "location.hash='#/atlas?view=galaxy'; true")
             waitFor(s, "!!document.querySelector('.galaxy-full canvas')")
