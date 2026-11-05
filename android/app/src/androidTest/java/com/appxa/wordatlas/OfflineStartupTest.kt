@@ -35,7 +35,9 @@ class OfflineStartupTest {
         val prefs = ctx.getSharedPreferences("offline-levels-v1", Context.MODE_PRIVATE)
         val localFile = File(ctx.filesDir, "offline-media/img/library.webp")
         localFile.parentFile!!.mkdirs(); localFile.writeText("offline-test")
-        prefs.edit().putBoolean("A1-complete", true).commit()
+        val manifest = ctx.assets.open("offline/A1.json").bufferedReader().use { it.readText() }
+        val hash = java.security.MessageDigest.getInstance("SHA-256").digest(manifest.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it.toInt() and 0xff) }
+        prefs.edit().putString("A1-manifest", hash).putBoolean("A1-complete", true).commit()
         shell("svc wifi disable"); shell("svc data disable")
         try {
             repeat(2) {

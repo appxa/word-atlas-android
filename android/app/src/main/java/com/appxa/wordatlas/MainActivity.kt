@@ -64,6 +64,7 @@ class MainActivity : Activity() {
     private inner class Bridge {
         @JavascriptInterface fun status(level: String): String = offline.status(level)
         @JavascriptInterface fun isDownloaded(level: String): Boolean = offline.isDownloaded(level)
+        @JavascriptInterface fun hasMedia(path: String): Boolean = offline.hasMedia(path)
         @JavascriptInterface fun start(level: String) = offline.start(level)
         @JavascriptInterface fun remove(level: String) = offline.remove(level)
         @JavascriptInterface fun saveBackup(data: String, name: String) {

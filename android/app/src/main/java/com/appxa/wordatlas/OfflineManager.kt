@@ -10,25 +10,28 @@ import java.util.concurrent.atomic.AtomicLong
 
 /** App-private persistent media. A level is complete only when every file is verified. */
 class OfflineManager private constructor(private val context: Context) {
-    data class Item(val path: String, val size: Long, val hash: String)
-    data class Pack(val total: Long, val items: List<Item>)
+    data class Item(val path: String, val size: Long, val hash: String, val origin: String)
+    data class Pack(val total: Long, val items: List<Item>, val fingerprint: String)
     data class State(val total: Long, @Volatile var downloaded: Long, @Volatile var status: String, @Volatile var error: String = "")
     private val levels = listOf("A1", "A2", "B1", "B2", "C1", "C2")
     private val prefs = context.getSharedPreferences("offline-levels-v1", Context.MODE_PRIVATE)
     private val runner = Executors.newSingleThreadExecutor()
     val root = File(context.filesDir, "offline-media")
     private val packs: Map<String, Pack> = levels.associateWith { name ->
-        val json = JSONObject(context.assets.open("offline/$name.json").bufferedReader().use { it.readText() })
+        val manifest = context.assets.open("offline/$name.json").bufferedReader().use { it.readText() }
+        val fingerprint = MessageDigest.getInstance("SHA-256").digest(manifest.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it.toInt() and 0xff) }
+        val json = JSONObject(manifest)
         val arr = json.getJSONArray("files")
-        val items = (0 until arr.length()).map { i -> val a = arr.getJSONArray(i); Item(a.getString(0), a.getLong(1), a.getString(2)) }
-        Pack(json.getLong("total"), items)
+        val items = (0 until arr.length()).map { i -> val a = arr.getJSONArray(i); Item(a.getString(0), a.getLong(1), a.getString(2), a.optString(3, "primary")) }
+        Pack(json.getLong("total"), items, fingerprint)
     }
     private val states: Map<String, State> = packs.mapValues { (level, p) ->
-        val complete = prefs.getBoolean("$level-complete", false)
+        val complete = prefs.getBoolean("$level-complete", false) && prefs.getString("$level-manifest", "") == p.fingerprint
         State(p.total, if (complete) p.total else prefs.getLong("$level-bytes", 0).coerceIn(0, p.total), if (complete) "complete" else "idle")
     }
     @Volatile private var active = ""
     @Synchronized fun isDownloaded(level: String): Boolean = states[level]?.status == "complete"
+    fun hasMedia(path: String): Boolean = try { fileFor(path).isFile } catch (_: Exception) { false }
     @Synchronized fun status(level: String): String {
         val s = states[level] ?: return "{}"
         return JSONObject().put("level", level).put("total", s.total).put("downloaded", s.downloaded).put("state", s.status).put("error", s.error).toString()
@@ -74,7 +77,7 @@ class OfflineManager private constructor(private val context: Context) {
             errors.get()?.let { throw IllegalStateException(it) }
             // All files have been hashed before marking the level complete.
             state.downloaded = p.total; state.status = "complete"
-            prefs.edit().putLong("$level-bytes", p.total).putBoolean("$level-complete", true).apply()
+            prefs.edit().putLong("$level-bytes", p.total).putString("$level-manifest", p.fingerprint).putBoolean("$level-complete", true).apply()
         } catch (e: Exception) {
             state.status = "error"; state.error = if (e.message?.contains("فضای") == true) e.message!! else "دانلود متوقف شد؛ اتصال اینترنت را بررسی و دوباره تلاش کن."
             prefs.edit().putBoolean("$level-complete", false).putLong("$level-bytes", state.downloaded).apply()
@@ -86,7 +89,12 @@ class OfflineManager private constructor(private val context: Context) {
         var failure: Exception? = null
         repeat(3) { attempt ->
             try {
-                val conn = URL("https://appxa.github.io/word-atlas/atlas/${item.path}").openConnection() as java.net.HttpURLConnection
+                val base = when (item.origin) {
+                    "primary" -> "https://appxa.github.io/word-atlas/atlas/"
+                    "upstream" -> "https://0xlei.tech/words/atlas/"
+                    else -> throw IllegalStateException("منبع فایل نامعتبر است")
+                }
+                val conn = URL(base + item.path).openConnection() as java.net.HttpURLConnection
                 conn.connectTimeout = 20000; conn.readTimeout = 30000; conn.instanceFollowRedirects = true
                 try {
                     if (conn.responseCode != 200) throw IllegalStateException("HTTP ${conn.responseCode}")

@@ -27,11 +27,23 @@ jobs:
       - run: npm run build
         env:
           ATLAS_BASE: ./
-      - run: gradle :app:assembleDebug
+      - name: Prepare signing key
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+        run: |
+          test -n "$KEYSTORE_B64"
+          printf '%s' "$KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/wordatlas.jks"
+      - name: Build signed release APK
+        run: gradle :app:assembleRelease
         working-directory: android
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/wordatlas.jks
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      - name: Verify APK signature
+        run: "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs android/app/build/outputs/apk/release/app-release.apk
       - uses: actions/upload-artifact@v4
         with:
           name: word-atlas-android-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          path: android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30

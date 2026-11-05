@@ -29,11 +29,14 @@ async function speak(url: string | null | undefined, text: string, accent: "uk" 
     current = a;
     try {
       await a.play();
-      await new Promise<void>((r) => {
-        a.onended = () => r();
-        a.onpause = () => r();
+      const completed = await new Promise<boolean>((r) => {
+        a.onended = () => r(true);
+        a.onpause = () => r(false);
+        a.onerror = () => r(false);
       });
-      return "recorded" as const;
+      if (mine !== token) return "stopped" as const;
+      if (completed) return "recorded" as const;
+      current = null;
     } catch {
       if (mine !== token) return "stopped" as const;
       current = null;
@@ -46,10 +49,11 @@ async function speak(url: string | null | undefined, text: string, accent: "uk" 
   const voices = speechSynthesis.getVoices().filter((v) => v.lang.replace("_", "-") === u.lang);
   const best = voices.find((v) => /premium|enhanced|natural|google/i.test(v.name)) || voices[0];
   if (best) u.voice = best;
-  await new Promise<void>((r) => {
-    u.onend = () => r();
-    u.onerror = () => r();
+  const completed = await new Promise<boolean>((r) => {
+    u.onend = () => r(true);
+    u.onerror = () => r(false);
     speechSynthesis.speak(u);
   });
-  return "device" as const;
+  if (mine !== token) return "stopped" as const;
+  return completed ? "device" as const : "unsupported" as const;
 }
