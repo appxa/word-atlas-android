@@ -26,8 +26,8 @@ class GalaxyScrollTest {
     private fun swipeDownOnCanvas(s: ActivityScenario<MainActivity>, selector: String) {
         js(s, "window.scrollTo(0, window.scrollY + document.querySelector('$selector').getBoundingClientRect().top - 110); true")
         Thread.sleep(1200)
-        val point = JSONObject(js(s, """(function(){const c=document.querySelector('$selector'),r=c.getBoundingClientRect(),x=innerWidth/2,y=Math.max(110,Math.min(r.top+r.height/2,innerHeight-180,r.bottom-150));return {x,y,dpr:devicePixelRatio,scroll:scrollY,isCanvas:document.elementFromPoint(x,y)===c}})()"""))
-        assertTrue("Swipe did not start on $selector", point.getBoolean("isCanvas"))
+        val point = JSONObject(js(s, """(function(){const c=document.querySelector('$selector'),r=c.getBoundingClientRect(); for(let y=Math.max(80,r.top+10);y<=Math.min(r.bottom-120,innerHeight-180);y+=15) for(let x=Math.max(20,r.left+10);x<Math.min(innerWidth-20,r.right-10);x+=20) if(document.elementFromPoint(x,y)===c) return {x,y,dpr:devicePixelRatio,scroll:scrollY,isCanvas:true}; return {x:0,y:0,dpr:devicePixelRatio,scroll:scrollY,isCanvas:false,rect:JSON.stringify(r),hit:document.elementFromPoint(innerWidth/2,Math.min(innerHeight-180,Math.max(80,r.top+150)))?.outerHTML.slice(0,200)} })()"""))
+        assertTrue("Swipe did not start on $selector: $point", point.getBoolean("isCanvas"))
         assertTrue("Not enough room to scroll", point.getDouble("scroll") > 120)
         val origin = IntArray(2)
         s.onActivity { a -> (a.findViewById<ViewGroup>(android.R.id.content).getChildAt(0) as WebView).getLocationOnScreen(origin) }
