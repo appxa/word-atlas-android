@@ -24,8 +24,11 @@ class GalaxyScrollTest {
         throw AssertionError("Page not ready: $condition")
     }
     private fun swipeDownOnCanvas(s: ActivityScenario<MainActivity>, selector: String) {
-        js(s, "window.scrollTo(0, window.scrollY + document.querySelector('$selector').getBoundingClientRect().top - 110); true")
-        Thread.sleep(1200)
+        // Page-entry animation and late font/layout changes can shift the panel.
+        repeat(4) {
+            js(s, "window.scrollTo(0, window.scrollY + document.querySelector('$selector').getBoundingClientRect().top - 110); true")
+            Thread.sleep(700)
+        }
         val point = JSONObject(js(s, """(function(){const c=document.querySelector('$selector'),r=c.getBoundingClientRect(); for(let y=Math.max(80,r.top+10);y<=Math.min(r.bottom-120,innerHeight-180);y+=15) for(let x=Math.max(20,r.left+10);x<Math.min(innerWidth-20,r.right-10);x+=20) if(document.elementFromPoint(x,y)===c) return {x,y,dpr:devicePixelRatio,scroll:scrollY,isCanvas:true}; return {x:0,y:0,dpr:devicePixelRatio,scroll:scrollY,isCanvas:false,rect:JSON.stringify(r),hit:document.elementFromPoint(innerWidth/2,Math.min(innerHeight-180,Math.max(80,r.top+150)))?.outerHTML.slice(0,200)} })()"""))
         assertTrue("Swipe did not start on $selector: $point", point.getBoolean("isCanvas"))
         assertTrue("Not enough room to scroll", point.getDouble("scroll") > 120)
@@ -49,7 +52,7 @@ class GalaxyScrollTest {
             assertTrue("Galaxy is not last after topics", js(s, "document.querySelector('.today-grid').lastElementChild.classList.contains('galaxy-panel') && !!(document.querySelector('.topics-panel').compareDocumentPosition(document.querySelector('.galaxy-panel')) & Node.DOCUMENT_POSITION_FOLLOWING)") == "true")
             // Add test-only trailing space so the last panel can be scrolled into view
             // even on short or unusually tall emulator displays.
-            js(s, "(function(){const d=document.createElement('div'); d.style.height='900px'; document.body.appendChild(d); return true})()")
+            js(s, "document.body.style.paddingBottom='900px'; true")
             swipeDownOnCanvas(s, ".galaxy-mini canvas")
             js(s, "location.hash='#/atlas?view=galaxy'; true")
             waitFor(s, "!!document.querySelector('.galaxy-full canvas')")
