@@ -45,9 +45,12 @@ jobs:
         env:
           EXPECTED_CERT_SHA256: cf57f7bcb61b5e97bea3985b2441bd504403aacc6af7fecd169e4a27490f79b0
         run: |
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs android/app/build/outputs/apk/release/app-release.apk | tee "$RUNNER_TEMP/certs.txt"
-          tr 'A-F' 'a-f' < "$RUNNER_TEMP/certs.txt" > "$RUNNER_TEMP/certs-lower.txt"
-          grep -q "certificate sha-256 digest: $EXPECTED_CERT_SHA256" "$RUNNER_TEMP/certs-lower.txt"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs android/app/build/outputs/apk/release/app-release.apk > "$RUNNER_TEMP/certs.txt" 2>&1
+          cat "$RUNNER_TEMP/certs.txt"
+          actual=$(awk '/Signer #1 certificate SHA-256 digest: /{print $NF; exit}' "$RUNNER_TEMP/certs.txt")
+          echo "APK certificate SHA-256: $actual"
+          test -n "$actual"
+          test "$actual" = "$EXPECTED_CERT_SHA256"
           echo "signing certificate matches the expected release key"
       - uses: actions/upload-artifact@v4
         with:
