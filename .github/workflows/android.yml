@@ -29,7 +29,7 @@ jobs:
           ATLAS_BASE: ./
       - name: Prepare signing key
         env:
-          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          KEYSTORE_B64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_B64 }}
         run: |
           test -n "$KEYSTORE_B64"
           printf '%s' "$KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/wordatlas.jks"
@@ -38,10 +38,17 @@ jobs:
         working-directory: android
         env:
           ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/wordatlas.jks
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS }}
+          ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_STORE_PASSWORD }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
       - name: Verify APK signature
+        env:
+          EXPECTED_CERT_SHA256: cf57f7bcb61b5e97bea3985b2441bd504403aacc6af7fecd169e4a27490f79b0
         run: |
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs android/app/build/outputs/apk/release/app-release.apk
+          out=$("$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs android/app/build/outputs/apk/release/app-release.apk)
+          echo "$out"
+          echo "$out" | tr 'A-F' 'a-f' | grep -q "certificate sha-256 digest: $EXPECTED_CERT_SHA256"
+          echo "signing certificate matches the expected release key"
       - uses: actions/upload-artifact@v4
         with:
           name: word-atlas-android-apk

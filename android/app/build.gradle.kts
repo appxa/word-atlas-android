@@ -2,14 +2,14 @@ plugins { id("com.android.application"); id("org.jetbrains.kotlin.android") }
 android {
     namespace = "com.appxa.wordatlas"
     compileSdk = 35
-    defaultConfig { applicationId = "com.appxa.wordatlas"; minSdk = 26; targetSdk = 35; testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"; versionCode = (System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1); versionName = "1.0.${System.getenv("GITHUB_RUN_NUMBER") ?: "0"}" }
+    defaultConfig { applicationId = "com.appxa.wordatlas"; minSdk = 26; targetSdk = 35; testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"; versionCode = (System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1); versionName = (System.getenv("APP_VERSION_NAME") ?: "1.1.0") }
     signingConfigs {
         create("production") {
             val keyPath = System.getenv("ANDROID_KEYSTORE_PATH")
             if (keyPath != null) {
                 storeFile = file(keyPath)
-                storePassword = System.getenv("ANDROID_KEY_PASSWORD")
-                keyAlias = "wordatlas"
+                storePassword = System.getenv("ANDROID_STORE_PASSWORD") ?: System.getenv("ANDROID_KEY_PASSWORD")
+                keyAlias = System.getenv("ANDROID_KEY_ALIAS") ?: "wordatlas"
                 keyPassword = System.getenv("ANDROID_KEY_PASSWORD")
             }
         }
