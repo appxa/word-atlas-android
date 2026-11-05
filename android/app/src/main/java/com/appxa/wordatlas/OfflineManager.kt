@@ -1,6 +1,7 @@
 package com.appxa.wordatlas
 
 import android.content.Context
+import android.os.SystemClock
 import org.json.JSONObject
 import java.io.File
 import java.net.URL
@@ -8,6 +9,9 @@ import java.net.HttpURLConnection
 import java.security.MessageDigest
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.Semaphore
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CancellationException
@@ -86,21 +90,37 @@ class OfflineManager private constructor(private val context: Context) {
             if (root.usableSpace < p.total - have + 16L * 1024 * 1024) throw IllegalStateException("فضای کافی برای دانلود وجود ندارد.")
             synchronized(this) { ensureActive(job); state.status = "downloading" }
             val downloaded = AtomicLong(have); val errors = java.util.concurrent.atomic.AtomicReference<String?>(null)
-            val pool = Executors.newFixedThreadPool(4)
+            val nextItem = AtomicInteger(0)
+            // Eight total workers, with per-host caps to avoid overwhelming either source.
+            val primarySlots = Semaphore(6); val upstreamSlots = Semaphore(4)
+            var lastSaved = 0L
+            val pool = Executors.newFixedThreadPool(8)
             try {
-                val tasks = missing.map { item -> pool.submit {
-                    if (job.cancelled.get() || errors.get() != null) return@submit
-                    try {
-                        fetch(item, job)
-                        synchronized(this@OfflineManager) {
-                            val n = downloaded.addAndGet(item.size); state.downloaded = n
-                            prefs.edit().putLong("$level-bytes", n).apply()
-                        }
-                    } catch (e: Exception) {
-                        if (!job.cancelled.get()) errors.compareAndSet(null, e.message ?: "دانلود ناموفق بود.")
+                val workers = (0 until 8).map { pool.submit {
+                    while (!job.cancelled.get() && errors.get() == null) {
+                        val index = nextItem.getAndIncrement()
+                        if (index >= missing.size) break
+                        val item = missing[index]
+                        val slots = when (item.origin) { "primary" -> primarySlots; "upstream" -> upstreamSlots; else -> null }
+                        if (slots == null) { errors.compareAndSet(null, "منبع فایل نامعتبر است"); break }
+                        var acquired = false
+                        try {
+                            while (!acquired && !job.cancelled.get() && errors.get() == null) acquired = slots.tryAcquire(200, TimeUnit.MILLISECONDS)
+                            if (!acquired || job.cancelled.get() || errors.get() != null) break
+                            fetch(item, job)
+                            synchronized(this@OfflineManager) {
+                                val n = downloaded.addAndGet(item.size); state.downloaded = n
+                                val now = SystemClock.elapsedRealtime()
+                                if (now - lastSaved >= 1000) {
+                                    prefs.edit().putLong("$level-bytes", n).apply(); lastSaved = now
+                                }
+                            }
+                        } catch (e: Exception) {
+                            if (!job.cancelled.get()) errors.compareAndSet(null, e.message ?: "دانلود ناموفق بود.")
+                        } finally { if (acquired) slots.release() }
                     }
                 } }
-                tasks.forEach { it.get() }
+                workers.forEach { it.get() }
             } finally { pool.shutdown() }
             ensureActive(job)
             errors.get()?.let { throw IllegalStateException(it) }
@@ -141,12 +161,11 @@ class OfflineManager private constructor(private val context: Context) {
                     ensureActive(job)
                     if (conn.responseCode != 200) throw IllegalStateException("HTTP ${conn.responseCode}")
                     conn.inputStream.use { input -> tmp.outputStream().buffered().use { output ->
-                        val buffer = ByteArray(32768)
-                        while (true) { ensureActive(job); val n = input.read(buffer); if (n < 0) break; output.write(buffer, 0, n) }
+                        MediaIntegrity.copyVerified(input, output, item.size, item.hash) { ensureActive(job) }
                     } }
                 } finally { job.connections.remove(conn); conn.disconnect() }
                 ensureActive(job)
-                if (!valid(tmp, item, job)) throw IllegalStateException("فایل دانلودشده ناقص است")
+                if (tmp.length() != item.size) throw IllegalStateException("فایل دانلودشده ناقص است")
                 ensureActive(job)
                 if (!tmp.renameTo(dest)) throw IllegalStateException("ذخیره‌سازی ناموفق بود")
                 return

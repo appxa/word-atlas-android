@@ -1,0 +1,50 @@
+name: Compare offline download speed
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.10.2
+      - name: Prepare app and baseline
+        run: |
+          npm ci && ATLAS_BASE=./ npm run build
+          git fetch --no-tags --depth=1 origin 04902e9ba0340692a4f6565e08d1ef842a7cb11e
+          git show 04902e9ba0340692a4f6565e08d1ef842a7cb11e:android/app/src/main/java/com/appxa/wordatlas/OfflineManager.kt > /tmp/offline-baseline.kt
+          cp android/app/src/main/java/com/appxa/wordatlas/OfflineManager.kt /tmp/offline-current.kt
+      - name: Enable hardware acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          arch: x86_64
+          disable-animations: true
+          script: |
+            cp /tmp/offline-baseline.kt android/app/src/main/java/com/appxa/wordatlas/OfflineManager.kt
+            adb logcat -c
+            gradle -p android :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.appxa.wordatlas.DownloadBenchmarkTest
+            echo 'BASELINE:'
+            adb logcat -d -s 'OfflineBenchmark:I' '*:S'
+            cp /tmp/offline-current.kt android/app/src/main/java/com/appxa/wordatlas/OfflineManager.kt
+            adb shell am force-stop com.appxa.wordatlas
+            adb logcat -c
+            gradle -p android :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.appxa.wordatlas.DownloadBenchmarkTest
+            echo 'OPTIMIZED:'
+            adb logcat -d -s 'OfflineBenchmark:I' '*:S'
