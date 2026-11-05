@@ -151,7 +151,7 @@ class OfflineManager private constructor(private val context: Context) {
             try {
                 val base = when (item.origin) {
                     "primary" -> "https://appxa.github.io/word-atlas/atlas/"
-                    "upstream" -> "https://0xlei.tech/words/atlas/"
+                    "upstream" -> "https://appxa.github.io/word-atlas-audio/"
                     else -> throw IllegalStateException("منبع فایل نامعتبر است")
                 }
                 val conn = URL(base + item.path).openConnection() as HttpURLConnection

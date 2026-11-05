@@ -83,8 +83,7 @@ export async function loadOpenAtlas(): Promise<Atlas> {
       const m = "media" in ref && typeof ref.media === "number" ? ref.media : (ref as Entry).m;
       const bit = MEDIA[kind];
       const level = typeof ref.cefr === "number" ? idx.cefr[ref.cefr] : ref.cefr;
-      // The independent online edition provides second-example recordings that
-      // are not present in the open repository's original media flags.
+      // Supplemental recordings are hosted separately from the main atlas.
       if (kind === "ex2" && !(m & bit)) return mediaUrl(`audio/ex2/${ref.id}.mp3`, level, true);
       return m & bit ? mediaUrl(`audio/${kind}/${ref.id}.mp3`, level) : null;
     },

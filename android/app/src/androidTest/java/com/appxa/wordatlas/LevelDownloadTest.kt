@@ -60,7 +60,7 @@ class LevelDownloadTest {
             checkPlayback(s, "library", ".entry-detail .pron .speak", "/audio/uk/library.mp3")
             checkPlayback(s, "library", ".entry-detail .examples li:first-child .ex-speak", "/audio/ex/library.mp3")
             checkPlayback(s, "library", ".entry-detail .examples li:nth-child(2) .ex-speak", "appxa.github.io/word-atlas/atlas/audio/ex2/library.mp3")
-            checkPlayback(s, "avenge", ".entry-detail .examples li:nth-child(2) .ex-speak", "0xlei.tech/words/atlas/audio/ex2/avenge.mp3")
+            checkPlayback(s, "avenge", ".entry-detail .examples li:nth-child(2) .ex-speak", "appxa.github.io/word-atlas-audio/audio/ex2/avenge.mp3")
             // Exercise the actual Profile controls, then cancel a partial C2 download.
             js(s, "location.hash='#/me'; true")
             var rowReady = false
