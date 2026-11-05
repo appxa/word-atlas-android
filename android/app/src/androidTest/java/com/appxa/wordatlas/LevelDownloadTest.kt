@@ -27,9 +27,9 @@ class LevelDownloadTest {
         throw AssertionError("App did not start")
     }
     private fun installAudioProbe(s: ActivityScenario<MainActivity>) {
-        js(s, """(function(){const play=HTMLMediaElement.prototype.play; HTMLMediaElement.prototype.play=function(){window.__playedUrl=this.src; window.__playedEnded=false; window.__playedError=false; this.addEventListener('ended',()=>window.__playedEnded=true,{once:true}); this.addEventListener('error',()=>window.__playedError=true,{once:true}); return play.call(this)}; return true})()""")
+        js(s, """(function(){const play=HTMLMediaElement.prototype.play; HTMLMediaElement.prototype.play=function(){window.__playedUrl=this.src; window.__playedEnded=false; window.__playedError=false; this.addEventListener('ended',()=>window.__playedEnded=true,{once:true}); this.addEventListener('error',()=>window.__playedError=true,{once:true}); return play.call(this)}; window.__audioWarnings=0; new MutationObserver(()=>{if(document.querySelector('.toast-warn')?.textContent?.includes('پخش صدا ممکن نیست')) window.__audioWarnings++}).observe(document.body,{childList:true,subtree:true}); return true})()""")
     }
-    private fun checkExamplePlayback(s: ActivityScenario<MainActivity>, word: String, expectedUrlPart: String) {
+    private fun checkPlayback(s: ActivityScenario<MainActivity>, word: String, selector: String, expectedUrlPart: String) {
         js(s, "location.hash='#/w/$word'; true")
         var ready = false
         for (i in 0 until 90) {
@@ -37,7 +37,7 @@ class LevelDownloadTest {
             Thread.sleep(500)
         }
         assertTrue("Second example not available for $word", ready)
-        js(s, "window.__playedUrl=''; window.__playedEnded=false; window.__playedError=false; document.querySelectorAll('.ex-speak')[1].click(); true")
+        js(s, "window.__playedUrl=''; window.__playedEnded=false; window.__playedError=false; window.__audioWarnings=0; document.querySelector('$selector').click(); true")
         var ended = false
         for (i in 0 until 90) {
             if (js(s, "window.__playedError===true") == "true") throw AssertionError("Audio playback error for $word")
@@ -46,6 +46,8 @@ class LevelDownloadTest {
         }
         assertTrue("Second example did not finish playing for $word", ended)
         assertTrue("Unexpected audio source for $word: " + js(s, "window.__playedUrl"), js(s, "window.__playedUrl.includes('$expectedUrlPart')") == "true")
+        Thread.sleep(2500)
+        assertTrue("False audio error displayed after successful playback of $word ($selector)", js(s, "window.__audioWarnings===0") == "true")
     }
     @Test fun downloadC2ThenRestartWithoutInternet() {
         shell("svc wifi enable"); shell("svc data enable"); Thread.sleep(10000)
@@ -55,8 +57,10 @@ class LevelDownloadTest {
         val s = ActivityScenario.launch(MainActivity::class.java)
         try {
             waitReady(s); installAudioProbe(s)
-            checkExamplePlayback(s, "library", "appxa.github.io/word-atlas/atlas/audio/ex2/library.mp3")
-            checkExamplePlayback(s, "avenge", "0xlei.tech/words/atlas/audio/ex2/avenge.mp3")
+            checkPlayback(s, "library", ".entry-detail .pron .speak", "/audio/uk/library.mp3")
+            checkPlayback(s, "library", ".entry-detail .examples li:first-child .ex-speak", "/audio/ex/library.mp3")
+            checkPlayback(s, "library", ".entry-detail .examples li:nth-child(2) .ex-speak", "appxa.github.io/word-atlas/atlas/audio/ex2/library.mp3")
+            checkPlayback(s, "avenge", ".entry-detail .examples li:nth-child(2) .ex-speak", "0xlei.tech/words/atlas/audio/ex2/avenge.mp3")
             js(s, "NativeOffline.start('C2'); true")
             var complete = false
             for (i in 0 until 900) {
@@ -77,7 +81,9 @@ class LevelDownloadTest {
             for (i in 0 until 60) { if (js(offline, "window.__downloadedMediaOk===true") == "true") { ok = true; break }; Thread.sleep(500) }
             assertTrue("Downloaded image/audio unavailable offline", ok)
             installAudioProbe(offline)
-            checkExamplePlayback(offline, "avenge", "appassets.androidplatform.net/offline/audio/ex2/avenge.mp3")
+            checkPlayback(offline, "avenge", ".entry-detail .pron .speak", "appassets.androidplatform.net/offline/audio/uk/avenge.mp3")
+            checkPlayback(offline, "avenge", ".entry-detail .examples li:first-child .ex-speak", "appassets.androidplatform.net/offline/audio/ex/avenge.mp3")
+            checkPlayback(offline, "avenge", ".entry-detail .examples li:nth-child(2) .ex-speak", "appassets.androidplatform.net/offline/audio/ex2/avenge.mp3")
         } finally { offline.close(); prefs.edit().clear().commit(); File(ctx.filesDir, "offline-media").deleteRecursively(); shell("svc wifi enable"); shell("svc data enable") }
     }
 }

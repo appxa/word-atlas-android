@@ -1,4 +1,5 @@
 import { duck } from "./sound";
+import { playRecording } from "./recordedAudio";
 
 let current: HTMLAudioElement | null = null;
 let token = 0;
@@ -27,20 +28,9 @@ async function speak(url: string | null | undefined, text: string, accent: "uk" 
     const a = new Audio(url);
     a.playbackRate = rate;
     current = a;
-    try {
-      await a.play();
-      const completed = await new Promise<boolean>((r) => {
-        a.onended = () => r(true);
-        a.onpause = () => r(false);
-        a.onerror = () => r(false);
-      });
-      if (mine !== token) return "stopped" as const;
-      if (completed) return "recorded" as const;
-      current = null;
-    } catch {
-      if (mine !== token) return "stopped" as const;
-      current = null;
-    }
+    const result = await playRecording(a, () => mine !== token);
+    if (current === a) current = null;
+    if (result !== "failed") return result;
   }
   if (!("speechSynthesis" in window)) return "unsupported" as const;
   const u = new SpeechSynthesisUtterance(text);
