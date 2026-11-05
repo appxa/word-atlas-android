@@ -32,10 +32,13 @@ const CUE_GAIN: Record<Cue, number> = {
 };
 
 let ctx: AudioContext | null = null;
+let appSuspended = false;
+let resumeAfterPause = false;
 let master: GainNode | null = null;
 const buffers = new Map<string, Promise<AudioBuffer | null>>();
 
 function audio() {
+  if (appSuspended) return null;
   if (!ctx) {
     const C = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!C) return null;
@@ -151,3 +154,19 @@ export function duck(on: boolean) {
 }
 
 export const ambienceId = () => amb?.id ?? null;
+
+/** Pause Web Audio while the Android activity is hidden or the screen is off. */
+export function pauseAppSound() {
+  if (appSuspended) return;
+  appSuspended = true;
+  resumeAfterPause = ctx?.state === "running";
+  if (resumeAfterPause && ctx) void ctx.suspend().catch(() => {});
+}
+
+/** Resume an existing sound context when the app returns to the foreground. */
+export function resumeAppSound() {
+  if (!appSuspended) return;
+  appSuspended = false;
+  if (resumeAfterPause && ctx && ctx.state !== "closed") void ctx.resume().catch(() => {});
+  resumeAfterPause = false;
+}

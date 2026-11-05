@@ -125,6 +125,20 @@ class MainActivity : Activity() {
             }
         }
     }
+    override fun onPause() {
+        if (::web.isInitialized) {
+            web.evaluateJavascript("window.dispatchEvent(new Event('wordatlas:pause'))", null)
+            web.onPause()
+        }
+        super.onPause()
+    }
+    override fun onResume() {
+        super.onResume()
+        if (::web.isInitialized) {
+            web.onResume()
+            web.evaluateJavascript("window.dispatchEvent(new Event('wordatlas:resume'))", null)
+        }
+    }
     override fun onDestroy() {
         (web.parent as? ViewGroup)?.removeView(web)
         web.stopLoading(); web.destroy()

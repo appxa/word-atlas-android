@@ -173,7 +173,7 @@ export function AtlasPage({
         )}
         <div className="filters-row">
           {view !== "galaxy" && (
-            <div className="segmented" role="group" aria-label="وضعیت یادگیری">
+            <div className="segmented atlas-status" role="group" aria-label="وضعیت یادگیری">
               {STATUS.map(([k, label]) => (
                 <button
                   key={k}
