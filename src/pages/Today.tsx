@@ -193,8 +193,8 @@ export function Today() {
         </section>
 
         <LevelPath />
-        <GalaxyPanel learned={learned} total={atlas.count} />
         <Topics />
+        <GalaxyPanel learned={learned} total={atlas.count} />
       </div>
     </div>
   );

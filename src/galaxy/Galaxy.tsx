@@ -191,7 +191,7 @@ export function Galaxy({
         const [a, b] = [...ps.values()];
         const dist = Math.hypot(a.x - b.x, a.y - b.y);
         if (drag.current?.pinch) eng.cam.dist = clampDist(eng.cam.dist * (drag.current.pinch / dist));
-        if (drag.current) drag.current.pinch = dist;
+        if (drag.current) { drag.current.pinch = dist; drag.current.moved = 9; }
         return;
       }
       if (drag.current) {
@@ -254,19 +254,19 @@ export function Galaxy({
     window.setTimeout(() => openWord(ref.id), 350);
   };
 
-  const onWheel = (e: React.WheelEvent) => {
-    const eng = engine.current;
-    if (!eng) return;
-    eng.cam.dist = clampDist(eng.cam.dist * Math.exp(e.deltaY * 0.0012));
-  };
-
   useEffect(() => {
-    // Wheel zoom must not scroll the page while over the galaxy.
+    // Ordinary wheel gestures scroll the page; modifier+wheel still zooms the map.
     const cv = canvas.current;
     if (!cv || mode !== "full") return;
-    const stop = (e: WheelEvent) => e.preventDefault();
-    cv.addEventListener("wheel", stop, { passive: false });
-    return () => cv.removeEventListener("wheel", stop);
+    const zoom = (e: WheelEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return;
+      const eng = engine.current;
+      if (!eng) return;
+      e.preventDefault();
+      eng.cam.dist = clampDist(eng.cam.dist * Math.exp(e.deltaY * 0.0012));
+    };
+    cv.addEventListener("wheel", zoom, { passive: false });
+    return () => cv.removeEventListener("wheel", zoom);
   }, [mode]);
 
   const lit = useMemo(() => layout.ids.reduce((n, id) => n + (cards[id] ? 1 : 0), 0), [layout, cards]);
@@ -286,14 +286,16 @@ export function Galaxy({
         onPointerMove={onMove}
         onPointerDown={onDown}
         onPointerUp={onUp}
-        onPointerCancel={onUp}
+        onPointerCancel={(e) => {
+          pointers.current.delete(e.pointerId);
+          drag.current = null;
+        }}
         onPointerLeave={() => {
           if (engine.current) engine.current.hover = -1;
           setHover(null);
         }}
-        onWheel={onWheel}
         role="img"
-        aria-label={`نقشه ستاره‌ای واژگان: ${layout.n} ستاره؛ روشن‌شده:  ${lit} ستاره. می‌توانی بکشی تا بچرخد، اسکرول کنی تا بزرگ شود، و روی ستاره بزنی تا واژه باز شود.`}
+        aria-label={`نقشه ستاره‌ای واژگان: ${layout.n} ستاره؛ روشن‌شده:  ${lit} ستاره. برای چرخاندن افقی بکش، برای بزرگ‌نمایی از دکمه‌ها استفاده کن و روی ستاره بزن تا واژه باز شود.`}
         tabIndex={0}
         onKeyDown={(e) => {
           const eng = engine.current;
@@ -382,7 +384,7 @@ export function Galaxy({
           <Share2 size={17} />
         </button>
       </div>
-      <p className="galaxy-hint">بکش تا بچرخد · اسکرول کن تا بزرگ شود · روی ستاره بزن تا واژه باز شود</p>
+      <p className="galaxy-hint">افقی بکش تا بچرخد · با + و − بزرگ‌نمایی کن · روی ستاره بزن</p>
     </div>
   );
 }

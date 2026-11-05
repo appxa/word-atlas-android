@@ -3799,8 +3799,10 @@ a:hover .mark-needle,
   display: block;
   width: 100%;
   height: 100%;
-  touch-action: none;
   outline: none;
+}
+.galaxy-full canvas {
+  touch-action: pan-y;
 }
 .galaxy-full {
   height: min(78vh, 820px);
